@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mô hình Multifamily – Dòng tiền theo Quý</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1520;--panel:#141e2b;--card:#1a2535;--border:#243044;
+  --text:#dde6f0;--muted:#5d7a9a;--accent:#e74c3c;
+  --green:#27ae60;--red:#e74c3c;--blue:#2980b9;--purple:#8b5cf6;
+  --yellow:#f39c12;
+}
+html,body{min-height:100%;font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+a{color:inherit;text-decoration:none}
+
+/* ── HEADER ── */
+.hdr{background:#0f1a28;border-bottom:1px solid var(--border);padding:10px 16px;position:sticky;top:0;z-index:20}
+.hdr h1{font-size:14px;font-weight:700;color:#e8f4ff;letter-spacing:.3px}
+.hdr p{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4}
+
+/* ── LAYOUT ── */
+.layout{display:flex;min-height:calc(100vh - 44px)}
+.sidebar{width:268px;min-width:268px;background:var(--panel);border-right:1px solid var(--border);padding:14px 12px;overflow-y:auto;flex-shrink:0}
+.main{flex:1;padding:14px;overflow:auto;min-width:0}
+
+/* ── SECTION LABELS ── */
+.slabel{font-size:9.5px;font-weight:800;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin:14px 0 7px;padding-left:2px}
+.slabel:first-child{margin-top:0}
+
+/* ── INPUTS ── */
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
+.row1{display:grid;grid-template-columns:1fr;gap:7px;margin-bottom:7px}
+.igrp label{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;line-height:1.3}
+.igrp input{width:100%;background:#0a1220;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-size:12px;outline:none;-webkit-appearance:none}
+.igrp input:focus{border-color:#3a7bd5;background:#0d1828}
+.igrp input::-webkit-inner-spin-button{-webkit-appearance:none}
+
+/* ── BUTTON ── */
+.btn-calc{width:100%;background:linear-gradient(135deg,#1a6b3c,#1e8048);color:#fff;border:none;padding:10px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px;letter-spacing:.3px}
+.btn-calc:hover{background:linear-gradient(135deg,#1e8048,#23944f)}
+.btn-calc:active{transform:scale(.98)}
+
+/* ── KPI CARDS ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.kpi .klabel{font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;line-height:1.3}
+.kpi .kval{font-size:17px;font-weight:800;color:#e8f4ff;line-height:1}
+.kpi .kval.pos{color:var(--green)}
+.kpi .kval.neg{color:var(--red)}
+.kpi .kval.neu{color:var(--yellow)}
+
+/* ── CHART ── */
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:14px}
+.box-title{font-size:10px;font-weight:700;color:#b0c8e0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.chart-wrap{position:relative;height:200px}
+
+/* ── TABLE CONTAINER ── */
+.tbl-box{background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:14px;overflow:hidden}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:#0a1220;color:var(--muted);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:7px 9px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right}
+thead th:first-child{text-align:left;position:sticky;left:0;background:#0a1220;z-index:2}
+tbody td{padding:5.5px 9px;border-bottom:1px solid #1a2535;text-align:right;white-space:nowrap;color:#c0d2e4}
+tbody td:first-child{text-align:left;font-weight:600;color:#d8eaf8;position:sticky;left:0;background:var(--card);z-index:1}
+tbody tr:hover td{background:#1e2d42}
+tbody tr:hover td:first-child{background:#1e2d42}
+.c-phase-ops td:first-child{color:#27ae60}
+.c-phase-exit td{background:#1a2820 !important}
+.c-phase-exit td:first-child{color:#f39c12}
+.neg{color:var(--red)!important}
+.pos{color:var(--green)!important}
+
+/* ── SENS TABLE ── */
+.sens-hdr{background:#0a1220!important;color:#3a7bd5!important;font-weight:700!important}
+.sens-td{font-size:11px!important}
+
+/* ── FOOTER NOTE ── */
+.fnote{font-size:9px;color:var(--muted);padding:7px 12px 9px;border-top:1px solid var(--border)}
+
+/* ── MOBILE ── */
+@media(max-width:720px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%;min-width:unset;border-right:none;border-bottom:1px solid var(--border)}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)!important}
+  .kpi .kval{font-size:15px}
+  .main{padding:10px}
+}
+@media(max-width:400px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)!important}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>📊 Mô hình tài chính Multifamily — Dòng tiền theo Quý (USD)</h1>
+  <p id="subtitle">Nhập giả định và nhấn <strong>Tính lại</strong> để cập nhật kết quả.</p>
+</div>
+
+<div class="layout">
+
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <div class="sidebar">
+
+    <div class="slabel">💰 Giá đầu tư</div>
+    <div class="row1"><div class="igrp"><label>Giá đất (USD) — trả Q1</label><input type="number" id="giaDat" value="4500000"></div></div>
+    <div class="row2">
+      <div class="igrp"><label>Suất ĐT (USD/M²)</label><input type="number" id="suatDauTu" value="250"></div>
+      <div class="igrp"><label>Diện tích sàn (M²)</label><input type="number" id="dienTich" value="32000"></div>
+    </div>
+    <div class="row1"><div class="igrp"><label>Soft cost (USD) — chia 3 quý đầu</label><input type="number" id="softCost" value="2200000"></div></div>
+    <div class="row1"><div class="igrp"><label>Thời gian xây dựng (quý)</label><input type="number" id="nConstQ" value="8" min="1"></div></div>
+
+    <div class="slabel">🏢 Vận hành</div>
+    <div class="row2">
+      <div class="igrp"><label>Số căn</label><input type="number" id="soCan" value="36"></div>
+      <div class="igrp"><label>Giá thuê/tháng (USD)</label><input type="number" id="giaThue" value="2900"></div>
+    </div>
+    <div class="row2">
+      <div class="igrp"><label>Trống (%)</label><input type="number" id="trong" value="5"></div>
+      <div class="igrp"><label>Thu nhập khác (% GPR)</label><input type="number" id="thuNhapKhac" value="0"></div>
+    </div>
+    <div class="row2">
+      <div class="igrp"><label>OPEX (% Net Revenue)</label><input type="number" id="opex" value="25"></div>
+      <div class="igrp"><label>Tốc độ tăng giá thuê (%/năm)</label><input type="number" id="tangTruong" value="3"></div>
+    </div>
+
+    <div class="slabel">🏦 Tài chính</div>
+    <div class="row2">
+      <div class="igrp"><label>Lãi suất vay (%/năm)</label><input type="number" id="laiSuat" value="8"></div>
+      <div class="igrp"><label>Tỷ lệ vay / CP xây dựng (%)</label><input type="number" id="ltv" value="65"></div>
+    </div>
+    <div class="row2">
+      <div class="igrp"><label>Số quý vận hành</label><input type="number" id="nOpsQ" value="2" min="1"></div>
+      <div class="igrp"><label>Khấu hao TSCĐ (năm)</label><input type="number" id="khauhao" value="30"></div>
+    </div>
+    <div class="row2">
+      <div class="igrp"><label>Exit cap (%)</label><input type="number" id="exitCap" value="5"></div>
+      <div class="igrp"><label>Phí bán/chuyển nhượng (%)</label><input type="number" id="phiBan" value="4"></div>
+    </div>
+    <div class="row2">
+      <div class="igrp"><label>WACC (%/năm)</label><input type="number" id="wacc" value="7" step="0.1"></div>
+      <div class="igrp"><label>Chiết khấu VCSH (%/năm)</label><input type="number" id="discEq" value="9" step="0.1"></div>
+    </div>
+    <div class="row2">
+      <div class="igrp"><label>Thuế TNDN / CIT (%)</label><input type="number" id="thue" value="29.8" step="0.1"></div>
+      <div class="igrp"><label>Phí thu xếp vay (%)</label><input type="number" id="phiThuXep" value="1.5" step="0.1"></div>
+    </div>
+
+    <button class="btn-calc" onclick="calculate()">⟳ Tính lại theo quý</button>
+  </div>
+
+  <!-- ═══════════════ MAIN ═══════════════ -->
+  <div class="main">
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <!-- TMĐT Breakdown -->
+    <div class="tbl-box" style="margin-bottom:14px">
+      <div class="box-title" style="padding:10px 12px 6px;border-bottom:1px solid var(--border)">Tổng mức đầu tư (TMĐT) — Chi tiết cơ cấu vốn</div>
+      <div class="tbl-scroll"><table id="tmdtTbl"></table></div>
+      <div class="fnote" id="tmdtNote"></div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-box">
+      <div class="box-title">Biểu đồ dòng tiền theo quý</div>
+      <div class="chart-wrap"><canvas id="cfChart"></canvas></div>
+    </div>
+
+    <!-- Detail Table -->
+    <div class="tbl-box">
+      <div class="box-title" style="padding:10px 12px 6px;border-bottom:1px solid var(--border)">Dòng tiền chi tiết theo quý</div>
+      <div class="tbl-scroll"><table id="detailTbl"></table></div>
+      <div class="fnote" id="fnote"></div>
+    </div>
+
+    <!-- Sensitivity -->
+    <div class="tbl-box">
+      <div class="box-title" style="padding:10px 12px 6px;border-bottom:1px solid var(--border)">Độ nhạy Equity IRR — Giá đất × Giá thuê/tháng</div>
+      <div class="tbl-scroll"><table id="sensTbl"></table></div>
+      <div class="fnote">IRR tính theo năm. Màu xanh: Equity IRR &gt; 10%. Hàng/cột "Base" là giả định hiện tại. % cho biết mức tăng giảm so với giá gốc.</div>
+    </div>
+
+    <!-- Sensitivity Commentary -->
+    <div class="tbl-box" id="sensComment" style="padding:14px 16px;line-height:1.7;font-size:12px"></div>
+
+  </div>
+</div>
+
+<script>
+// ─── UTILITIES ───────────────────────────────────────────
+let chartInst = null;
+
+const $ = id => document.getElementById(id);
+const N = id => parseFloat($(id).value) || 0;
+const I = id => parseInt($(id).value)  || 0;
+
+function usd(v){
+  if(v===null||v===undefined||isNaN(v)) return '–';
+  return '$'+Math.round(v).toLocaleString('en-US');
+}
+function usdSign(v){
+  if(v===null||isNaN(v)) return '–';
+  const neg=v<0;
+  return (neg?'−':'')+'$'+Math.abs(Math.round(v)).toLocaleString('en-US');
+}
+function pct(v,dec=1){
+  if(v===null||isNaN(v)) return '–';
+  return (v*100).toFixed(dec)+'%';
+}
+
+// ─── IRR (bisection) ─────────────────────────────────────
+function irr(cfs){
+  const npv=(r)=>cfs.reduce((s,c,i)=>s+c/Math.pow(1+r,i),0);
+  let lo=-0.9999, hi=50, mid;
+  if(npv(lo)*npv(hi)>0) return null;
+  for(let i=0;i<200;i++){
+    mid=(lo+hi)/2;
+    const v=npv(mid);
+    if(Math.abs(v)<0.5||(hi-lo)<1e-9) break;
+    (v*npv(lo)>0)?lo=mid:hi=mid;
+  }
+  return mid;
+}
+function npv(cfs,qr){
+  return cfs.reduce((s,c,i)=>s+c/Math.pow(1+qr,i),0);
+}
+function annualIRR(qIRR){
+  if(qIRR===null) return null;
+  return Math.pow(1+qIRR,4)-1;
+}
+
+// ─── CORE MODEL ──────────────────────────────────────────
+function runModel(p){
+  const {giaDat,suatDauTu,dienTich,softCost,nConstQ,
+         soCan,giaThue,trong,thuNhapKhac,opex,tangTruong,
+         laiSuat,ltv,nOpsQ,khauhao,exitCap,phiBan,wacc,discEq,thue,phiThuXep} = p;
+
+  const hardTotal  = suatDauTu * dienTich;
+  const hardQ      = hardTotal / nConstQ;
+  const softQ      = softCost / 3;
+  const qRate      = laiSuat / 100 / 4;
+  const ltvR       = ltv / 100;
+  const taxR       = thue / 100;
+  const depQ       = (hardTotal + softCost) / (khauhao * 4);
+  const gprQ       = soCan * giaThue * 3;
+
+  // ── Cơ cấu vốn ──
+  const loanCommitment  = (hardTotal + softCost) * ltvR;          // Tổng giá trị khoản vay cam kết
+  const arrangementFee  = loanCommitment * (phiThuXep||0) / 100;  // Phí thu xếp vay (1 lần, Q1)
+  // Vốn CSH = đất + phần không vay của hard/soft + phí thu xếp vay
+  const equityTotal     = giaDat + (hardTotal + softCost) * (1 - ltvR) + arrangementFee;
+
+  const rows = [];
+  let loanBal = 0;
+  let capInterest = 0;
+
+  // ══ CONSTRUCTION PHASE ══
+  for(let q=1; q<=nConstQ; q++){
+    const land  = q===1 ? giaDat : 0;
+    const hard  = hardQ;
+    const soft  = q<=3  ? softQ  : 0;
+    const cost  = land + hard + soft;
+
+    const loanDraw = (hard + soft) * ltvR;
+    // Q1: equity outflow includes đất + phần CSH hard/soft + phí thu xếp vay
+    const equityDraw = land + (hard + soft) * (1 - ltvR) + (q===1 ? arrangementFee : 0);
+
+    const intCapQ = loanBal * qRate;
+    capInterest  += intCapQ;
+    loanBal       = loanBal + intCapQ + loanDraw;
+
+    rows.push({
+      q, label:'Q'+q, phase:'C',
+      land, hard, soft, cost,
+      arrangementFee: q===1 ? arrangementFee : 0,
+      netRev:0, opexAmt:0, dep:0, ebit:0, tax:0,
+      fcff:-cost,                // FCFF unlevered (không tính phí TC)
+      loanDraw, intCapQ, interest:0, loanRepay:0,
+      equityDraw, exitVal:0, exitProceeds:0,
+      loanBal,
+      finCF: loanDraw - equityDraw,
+      fcfe: -equityDraw,         // FCFE = âm đúng bằng vốn CSH bỏ ra mỗi quý
+    });
+  }
+
+  const loanAtOpsStart = loanBal;
+
+  // ══ OPERATIONS PHASE ══
+  for(let q=1; q<=nOpsQ; q++){
+    const aq = nConstQ + q;
+    const yr = Math.floor((q-1)/4);
+    const g  = Math.pow(1 + tangTruong/100, yr);
+    const gpr     = gprQ * g;
+    const netRev  = gpr * (1 - trong/100) + gpr * thuNhapKhac/100;
+    const opexAmt = netRev * opex/100;
+    const ebit    = netRev - opexAmt - depQ;
+    const taxAmt  = Math.max(0, ebit * taxR);
+    const nopat   = ebit - taxAmt;
+    const fcffOps = nopat + depQ;  // = netRev - opexAmt - taxAmt
+
+    // Loan: interest-only during operations
+    const interest = loanBal * qRate;
+    const isExit   = q === nOpsQ;
+
+    // Exit value: NOI tại quý thoái vốn (annualised) / Exit Cap Rate
+    let exitVal = 0, exitProceeds = 0;
+    if(isExit){
+      const annualNOI = (netRev - opexAmt) * 4;   // NOI quý × 4 → năm
+      exitVal         = annualNOI / (exitCap/100); // cap rate tính theo năm
+      exitProceeds    = exitVal * (1 - phiBan/100);
+    }
+
+    const loanRepay = isExit ? loanBal : 0;
+    const fcff      = fcffOps + (isExit ? exitProceeds : 0); // exit proceeds into FCFF (before debt)
+    const fcfe      = fcff - interest - loanRepay;            // equity: subtract interest + principal repay
+
+    loanBal = isExit ? 0 : loanBal;
+
+    rows.push({
+      q:aq, label:'Q'+aq, phase: isExit?'X':'O',
+      land:0, hard:0, soft:0, cost:0,
+      netRev, opexAmt, dep:depQ, ebit, tax:taxAmt,
+      fcff, fcffOps,
+      loanDraw:0, intCapQ:0, interest, loanRepay,
+      equityDraw:0, exitVal, exitProceeds,
+      loanBal,
+      finCF: -interest - loanRepay,
+      fcfe,
+    });
+  }
+
+  // ══ KPIs ══
+  const fcffStream = rows.map(r=>r.fcff);
+  const fcfeStream = rows.map(r=>r.fcfe);
+
+  const qIRR_proj   = irr(fcffStream);
+  const qIRR_eq     = irr(fcfeStream);
+  const projIRR     = annualIRR(qIRR_proj);
+  const eqIRR       = annualIRR(qIRR_eq);
+  // NPV FCFE: chiết khấu theo tỷ lệ yêu cầu vốn chủ sở hữu (quarterly compounding)
+  const qDiscEq     = Math.pow(1 + discEq/100, 0.25) - 1;
+  const npvFCFE     = npv(fcfeStream, qDiscEq);
+
+  // Payback: first quarter cumulative FCFF turns positive
+  let cum=0, paybackQ=null;
+  for(let i=0;i<fcffStream.length;i++){
+    cum+=fcffStream[i];
+    if(cum>=0&&paybackQ===null) paybackQ=i+1;
+  }
+
+  const tmdt        = hardTotal + softCost + capInterest;          // TMĐT không gồm đất & phí TC
+  const tmdtFull    = giaDat + tmdt + arrangementFee;             // Toàn bộ vốn đầu tư thực tế
+  const costPerUnit = soCan > 0 ? tmdtFull / soCan : 0;          // Chi phí đầu tư / căn
+
+  // Exit summary
+  const exitRow      = rows.find(r => r.phase === 'X');
+  const exitVal      = exitRow ? exitRow.exitVal      : 0;
+  const exitProceeds = exitRow ? exitRow.exitProceeds : 0;
+  const pricePerUnit = soCan > 0 ? exitVal / soCan : 0;
+
+  return {rows, fcffStream, fcfeStream,
+          tmdt, tmdtFull, costPerUnit, capInterest,
+          loanCommitment, arrangementFee, equityTotal,
+          projIRR, eqIRR, npvFCFE, paybackQ,
+          nConstQ, loanAtOpsStart, hardTotal, softCost,
+          exitVal, exitProceeds, pricePerUnit};
+}
+
+// ─── GET PARAMS ──────────────────────────────────────────
+function getParams(){
+  return {
+    giaDat:     N('giaDat'),
+    suatDauTu:  N('suatDauTu'),
+    dienTich:   N('dienTich'),
+    softCost:   N('softCost'),
+    nConstQ:    I('nConstQ') || 8,
+    soCan:      I('soCan'),
+    giaThue:    N('giaThue'),
+    trong:      N('trong'),
+    thuNhapKhac:N('thuNhapKhac'),
+    opex:       N('opex'),
+    tangTruong: N('tangTruong'),
+    laiSuat:    N('laiSuat'),
+    ltv:        N('ltv'),
+    nOpsQ:      I('nOpsQ') || 16,
+    khauhao:    N('khauhao') || 30,
+    exitCap:    N('exitCap'),
+    phiBan:     N('phiBan'),
+    wacc:       N('wacc'),
+    discEq:     N('discEq'),
+    thue:       N('thue'),
+    phiThuXep:  N('phiThuXep'),
+  };
+}
+
+// ─── RENDER TMĐT TABLE ───────────────────────────────────
+function renderTMDT(res, p){
+  const { tmdt, tmdtFull, capInterest, hardTotal, softCost,
+          loanCommitment, arrangementFee, equityTotal } = res;
+  const giaDat   = p.giaDat;
+  const dienTich = p.dienTich || 1;
+  const soCan    = p.soCan    || 1;
+
+  // ── Bảng chi tiết cấu phần đầu tư ──
+  const items = [
+    { label:'Giá đất / tiền thuê đất',
+      sub:'Trả Q1 — vốn chủ sở hữu',
+      val: giaDat, bold:false },
+    { label:'Chi phí xây dựng (Hard cost)',
+      sub:`${Number(p.suatDauTu).toLocaleString('en-US')} USD/m² × ${Number(dienTich).toLocaleString('en-US')} m²`,
+      val: hardTotal, bold:false },
+    { label:'Soft cost',
+      sub:'Phân bổ đều 3 quý đầu xây dựng',
+      val: softCost, bold:false },
+    { label:'Lãi vay trong thời gian XD',
+      sub:`Tích lũy ${p.nConstQ} quý @ ${p.laiSuat}%/năm — capitalize vào nợ gốc`,
+      val: capInterest, bold:false },
+    { label:'Phí thu xếp khoản vay',
+      sub:`${p.phiThuXep}% × Giá trị khoản vay $${Math.round(loanCommitment).toLocaleString('en-US')} — trả Q1 từ VCSH`,
+      val: arrangementFee, bold:false },
+    { label:'TMĐT (không gồm đất & phí TC)',
+      sub:'Hard + Soft + Lãi vay XD',
+      val: tmdt, bold:true, sep:true },
+    { label:'Tổng vốn đầu tư thực tế',
+      sub:'Đất + Hard + Soft + Lãi vay XD + Phí thu xếp',
+      val: tmdtFull, bold:true, accent:true },
+  ];
+
+  const thead = `<thead><tr>
+    <th style="text-align:left;min-width:190px">Hạng mục</th>
+    <th>Giá trị (USD)</th>
+    <th>% Tổng VĐT</th>
+    <th>USD / m² sàn</th>
+    <th>USD / căn</th>
+  </tr></thead>`;
+
+  let tbody = '<tbody>';
+  for(const r of items){
+    const pctTotal = tmdtFull > 0 ? (r.val/tmdtFull*100).toFixed(1)+'%' : '–';
+    const perSqm   = '$'+Math.round(r.val/dienTich).toLocaleString('en-US');
+    const perUnit  = '$'+Math.round(r.val/soCan).toLocaleString('en-US');
+    const sep  = r.sep    ? 'border-top:2px solid #3a5070;' : '';
+    const bld  = r.bold   ? 'font-weight:700;' : '';
+    const bg   = r.accent ? 'background:#1e3050!important;' : r.bold ? 'background:#192840!important;' : '';
+    const vc   = r.accent ? 'color:#f39c12;' : r.bold ? 'color:#e8f4ff;' : 'color:#c0d2e4;';
+    const sc   = r.bold   ? '#7ab8e0' : 'var(--muted)';
+    tbody += `<tr style="${bg}${sep}">
+      <td style="${bld}${bg}">${r.label}
+        ${r.sub?`<div style="font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${r.sub}</div>`:''}
+      </td>
+      <td style="${vc}${bld}">$${Math.round(r.val).toLocaleString('en-US')}</td>
+      <td style="${bld}color:${r.bold?'#c8d8ea':'var(--muted)'}">${pctTotal}</td>
+      <td style="color:${sc};${r.bold?'font-weight:600':''}font-size:11px">${perSqm}</td>
+      <td style="color:${r.accent?'#f39c12':sc};${r.bold?'font-weight:700':''}font-size:11px">${perUnit}</td>
+    </tr>`;
+  }
+  tbody += '</tbody>';
+  $('tmdtTbl').innerHTML = thead + tbody;
+
+  // ── Summary cơ cấu vốn ──
+  const loanPct  = tmdtFull > 0 ? (loanCommitment/tmdtFull*100).toFixed(1) : '–';
+  const eqPct    = tmdtFull > 0 ? (equityTotal/tmdtFull*100).toFixed(1) : '–';
+  const landEqPct= equityTotal > 0 ? (giaDat/equityTotal*100).toFixed(1) : '–';
+  const cashEqPct= equityTotal > 0 ? ((equityTotal-giaDat)/equityTotal*100).toFixed(1) : '–';
+
+  $('tmdtNote').innerHTML = `
+    <div style="margin-bottom:6px;font-weight:700;font-size:11px;color:#b0c8e0">Cơ cấu vốn dự án</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="background:#0f1a28;border-radius:5px;padding:10px 12px;border-left:3px solid #3a7bd5">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Vốn vay (Loan)</div>
+        <div style="font-size:15px;font-weight:800;color:#3a9bd5">$${Math.round(loanCommitment).toLocaleString('en-US')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">${loanPct}% Tổng VĐT · ${p.ltv}% CP xây dựng</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">Phí thu xếp: $${Math.round(arrangementFee).toLocaleString('en-US')} (${p.phiThuXep}%)</div>
+      </div>
+      <div style="background:#0f1a28;border-radius:5px;padding:10px 12px;border-left:3px solid #27ae60">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Vốn CSH (Equity)</div>
+        <div style="font-size:15px;font-weight:800;color:#27ae60">$${Math.round(equityTotal).toLocaleString('en-US')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">${eqPct}% Tổng VĐT</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">
+          Đất: $${Math.round(giaDat).toLocaleString('en-US')} (${landEqPct}%) &nbsp;|&nbsp;
+          Tiền mặt: $${Math.round(equityTotal-giaDat).toLocaleString('en-US')} (${cashEqPct}%)
+        </div>
+      </div>
+    </div>
+    <div style="font-size:9.5px;color:var(--muted)">
+      Diện tích sàn: <strong>${Number(dienTich).toLocaleString('en-US')} m²</strong> | ${soCan} căn |
+      Tỷ lệ vay ${p.ltv}% trên Hard + Soft cost (không gồm đất) |
+      Vốn CSH = Đất + (1−LTV)×(Hard+Soft) + Phí thu xếp vay |
+      Lãi vay capitalize trong XD, hoàn trả bullet tại Exit.
+    </div>`;
+}
+
+// ─── RENDER KPIs ─────────────────────────────────────────
+function renderKPIs(res, p){
+  const {tmdtFull,costPerUnit,capInterest,projIRR,eqIRR,npvFCFE,paybackQ,exitVal,pricePerUnit} = res;
+  const pay = paybackQ ? `Q${paybackQ}` : 'Không HV';
+  const eqLabel = eqIRR!==null ? pct(eqIRR) : '–';
+
+  function kpi(label,val,cls='',sub=''){
+    return `<div class="kpi"><div class="klabel">${label}</div><div class="kval ${cls}">${val}</div>${sub?`<div style="font-size:9px;color:var(--muted);margin-top:4px">${sub}</div>`:''}</div>`;
+  }
+  $('kpiGrid').innerHTML =
+    kpi('Tổng vốn đầu tư (TMĐT)', usd(tmdtFull), '', 'Bao gồm đất + XD + lãi vay') +
+    kpi('Chi phí đầu tư / căn', usd(costPerUnit), '', `${p.soCan} căn`) +
+    kpi('Project IRR', pct(projIRR), projIRR>0?'pos':'neg') +
+    kpi('Equity IRR', eqLabel, eqIRR!==null&&eqIRR>0?'pos':'neg') +
+    kpi('NPV FCFE', usd(npvFCFE), npvFCFE>=0?'pos':'neg', `CK VCSH ${p.discEq}%/năm`) +
+    kpi('Payback Period', pay, paybackQ?'neu':'neg') +
+    kpi('Giá thoái vốn (gross)', usd(exitVal), '', `Exit cap ${p.exitCap}%/năm`) +
+    kpi('Giá bán TB / căn', usd(pricePerUnit), 'pos', `${p.soCan} căn`);
+}
+
+// ─── RENDER CHART ────────────────────────────────────────
+function renderChart(res){
+  const {rows} = res;
+  const labels    = rows.map(r=>r.label);
+  const fcffData  = rows.map(r=>Math.round(r.fcff));
+  const exitData  = rows.map(r=>Math.round(r.exitProceeds||0));
+  const fcfeData  = rows.map(r=>Math.round(r.fcfe));
+
+  if(chartInst) chartInst.destroy();
+  const ctx = $('cfChart').getContext('2d');
+  chartInst = new Chart(ctx,{
+    data:{
+      labels,
+      datasets:[
+        {type:'bar', label:'FCFF',
+         data:fcffData,
+         backgroundColor:fcffData.map(v=>v>=0?'rgba(39,174,96,.75)':'rgba(192,57,43,.75)'),
+         order:2},
+        {type:'bar', label:'Dòng tiền thoái vốn',
+         data:exitData,
+         backgroundColor:'rgba(243,156,18,.7)',
+         order:2},
+        {type:'line', label:'FCFE',
+         data:fcfeData,
+         borderColor:'rgba(139,92,246,1)',
+         backgroundColor:'transparent',
+         pointRadius:2, pointHoverRadius:4,
+         borderWidth:2, tension:.3,
+         order:1},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'bottom',labels:{color:'#7a9bb5',font:{size:10},boxWidth:12,padding:12}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${usdSign(c.raw)}`}}
+      },
+      scales:{
+        x:{ticks:{color:'#4d6a8a',font:{size:8.5},maxRotation:45},grid:{color:'#1a2535'}},
+        y:{ticks:{color:'#4d6a8a',font:{size:9},
+           callback:v=>Math.abs(v)>=1e6?'$'+(v/1e6).toFixed(1)+'M':
+                       Math.abs(v)>=1000?'$'+(v/1000).toFixed(0)+'K':'$'+v},
+           grid:{color:'#1a2535'}}
+      }
+    }
+  });
+}
+
+// ─── RENDER DETAIL TABLE ─────────────────────────────────
+function renderTable(res,p){
+  const {rows} = res;
+  let th=`<thead><tr>
+    <th>QUÝ</th>
+    <th>Net Revenue</th>
+    <th>OPEX</th>
+    <th>Thuế TNDN</th>
+    <th>FCFF vận hành</th>
+    <th>DT thoái vốn</th>
+    <th>FCFF (dự án)</th>
+    <th>FCFE (vốn CSH)</th>
+    <th>Dư nợ cuối quý</th>
+  </tr></thead>`;
+
+  // Tính tổng các cột
+  const sum = key => rows.reduce((acc,r) => acc + (r[key]||0), 0);
+  const totNetRev   = sum('netRev');
+  const totOpex     = sum('opexAmt');
+  const totTax      = sum('tax');
+  const totFcffOps  = rows.reduce((acc,r) => acc + (r.fcffOps!=null ? r.fcffOps : (r.phase==='C'?r.fcff:0)), 0);
+  const totExitProc = sum('exitProceeds');
+  const totFcff     = sum('fcff');
+  const totFcfe     = sum('fcfe');
+
+  let tb='<tbody>';
+  for(const r of rows){
+    const rowCls = r.phase==='O'?'c-phase-ops': r.phase==='X'?'c-phase-exit':'';
+    const sg=v=>v<0?'neg':v>0?'pos':'';
+
+    const exitProceedsCell = r.exitProceeds > 0
+      ? `<span class="pos">${usdSign(r.exitProceeds)}</span><br><small style="color:#7a9bb5;font-size:9px">Gross: ${usdSign(r.exitVal)}</small>`
+      : '<span style="color:var(--muted)">–</span>';
+
+    tb+=`<tr class="${rowCls}">
+      <td>${r.label}${r.phase==='X'?' 🏁':''}</td>
+      <td class="${sg(r.netRev)}">${r.netRev?usdSign(r.netRev):'$0'}</td>
+      <td class="${r.opexAmt?'neg':''}">${r.opexAmt?usdSign(-r.opexAmt):'$0'}</td>
+      <td class="${r.tax?'neg':''}">${r.tax?usdSign(-r.tax):'$0'}</td>
+      <td class="${sg(r.fcffOps||r.fcff)}">${usdSign(r.fcffOps!=null?r.fcffOps:r.fcff)}</td>
+      <td>${exitProceedsCell}</td>
+      <td class="${sg(r.fcff)}">${usdSign(r.fcff)}</td>
+      <td class="${sg(r.fcfe)}">${usdSign(r.fcfe)}</td>
+      <td>${usd(r.loanBal)}</td>
+    </tr>`;
+  }
+
+  // Dòng tổng cộng
+  const sg = v => v<0?'neg':v>0?'pos':'';
+  tb += `<tr style="background:#0f1a28;border-top:2px solid #3a5070;font-weight:700">
+    <td style="color:#f39c12">∑ Tổng cộng</td>
+    <td class="${sg(totNetRev)}">${usdSign(totNetRev)}</td>
+    <td class="${totOpex?'neg':''}">${totOpex?usdSign(-totOpex):'$0'}</td>
+    <td class="${totTax?'neg':''}">${totTax?usdSign(-totTax):'$0'}</td>
+    <td class="${sg(totFcffOps)}">${usdSign(totFcffOps)}</td>
+    <td class="pos">${totExitProc?usdSign(totExitProc):'–'}</td>
+    <td class="${sg(totFcff)}">${usdSign(totFcff)}</td>
+    <td class="${sg(totFcfe)}">${usdSign(totFcfe)}</td>
+    <td style="color:var(--muted)">–</td>
+  </tr>`;
+
+  tb+='</tbody>';
+  $('detailTbl').innerHTML=th+tb;
+
+  $('fnote').textContent=`TMDT = Hard cost + Soft cost + Lãi vay tích lũy trong ${p.nConstQ} quý xây dựng. `
+    +`Thuế TNDN ${p.thue}% áp dụng trên EBIT (Doanh thu – OPEX – Khấu hao). `
+    +`LTV ${p.ltv}% cho phần Hard+Soft cost; đất bằng vốn chủ sở hữu. `
+    +`Vay bullet — trả gốc tại Exit.`;
+}
+
+// ─── RENDER SENSITIVITY ──────────────────────────────────
+function renderSens(baseP){
+  // Biến động: -20%, -10%, Base, +10%, +20%
+  const deltas  = [-0.20, -0.10, 0, 0.10, 0.20];
+  const dLabels = ['-20%', '-10%', 'Base', '+10%', '+20%'];
+
+  const lands = deltas.map(d => baseP.giaDat  * (1+d));
+  const rents = deltas.map(d => baseP.giaThue * (1+d));
+
+  // Tính toàn bộ ma trận IRR
+  const matrix = lands.map(land =>
+    rents.map(rent => {
+      const r2 = runModel({...baseP, giaDat:land, giaThue:rent});
+      return r2.eqIRR;
+    })
+  );
+
+  // ── Bảng ──
+  let h = '<thead>';
+  // Dòng 1: header giá thuê tuyệt đối
+  h += '<tr><th class="sens-hdr" rowspan="2">Giá đất \\ Giá thuê</th>';
+  rents.forEach(r => { h += `<th style="text-align:center">$${Math.round(r).toLocaleString('en-US')}</th>`; });
+  h += '</tr>';
+  // Dòng 2: % thay đổi
+  h += '<tr>';
+  dLabels.forEach((dl,i) => {
+    const isBase = i===2;
+    h += `<th style="text-align:center;color:${isBase?'#f39c12':'var(--muted)'};">${dl}</th>`;
+  });
+  h += '</tr></thead><tbody>';
+
+  lands.forEach((land, ri) => {
+    const isBaseRow = ri===2;
+    h += `<tr>`;
+    // Cột đầu: giá đất + % label
+    h += `<td class="sens-hdr" style="white-space:nowrap">
+      $${Math.round(land).toLocaleString('en-US')}
+      <span style="color:${isBaseRow?'#f39c12':'var(--muted)'};font-size:9px;margin-left:4px">${dLabels[ri]}</span>
+    </td>`;
+    matrix[ri].forEach((v, ci) => {
+      const isBaseCell = ri===2 && ci===2;
+      const s = v!==null ? (v*100).toFixed(1)+'%' : '–';
+      const c = v===null?'neg': v>0.10?'pos': v>0?'neu':'neg';
+      const bdr = isBaseCell ? 'outline:2px solid #f39c12;outline-offset:-2px;' : '';
+      h += `<td class="${c} sens-td" style="${bdr}text-align:center">${s}</td>`;
+    });
+    h += '</tr>';
+  });
+  h += '</tbody>';
+  $('sensTbl').innerHTML = h;
+
+  // ── Nhận xét tự động ──
+  renderSensComment(baseP, matrix, deltas, dLabels, lands, rents);
+}
+
+function renderSensComment(baseP, matrix, deltas, dLabels, lands, rents){
+  const baseIRR = matrix[2][2];  // Base × Base
+
+  if(baseIRR === null){ $('sensComment').innerHTML='<span style="color:var(--muted)">Không tính được IRR cơ sở.</span>'; return; }
+
+  const f1  = v => v!==null ? (v*100).toFixed(1)+'%' : '–';
+  // Hiển thị IRR cụ thể tại mỗi kịch bản (không dùng "điểm %")
+  const fIRR = v => v!==null ? `<strong>${(v*100).toFixed(1)}%</strong>` : '–';
+
+  // Độ nhạy theo giá thuê (hàng Base = ri=2, thay đổi cột)
+  const irrRentLow  = matrix[2][0];
+  const irrRentHigh = matrix[2][4];
+  const rentDn10    = matrix[2][1];
+  const rentUp10    = matrix[2][3];
+  const rentElast   = irrRentHigh!==null && irrRentLow!==null ? (irrRentHigh - irrRentLow) / 0.40 : null;
+
+  // Độ nhạy theo giá đất (cột Base = ci=2, thay đổi hàng)
+  const irrLandLow  = matrix[0][2];
+  const irrLandHigh = matrix[4][2];
+  const landDn10    = matrix[1][2];
+  const landUp10    = matrix[3][2];
+  const landElast   = irrLandHigh!==null && irrLandLow!==null ? (irrLandHigh - irrLandLow) / 0.40 : null;
+
+  const moreRentSensitive = rentElast!==null && landElast!==null && Math.abs(rentElast) > Math.abs(landElast);
+  const dominant = moreRentSensitive ? 'giá cho thuê' : 'giá đất';
+  const accentCol = moreRentSensitive ? '#27ae60' : '#e74c3c';
+
+  // Mô tả cụ thể ±10% & ±20%
+  function arrowLine(label, dn20, dn10, base, up10, up20){
+    const c = v => v===null?'–':`${(v*100).toFixed(1)}%`;
+    return `
+      <tr>
+        <td style="padding:7px 8px;font-weight:600;color:#d8eaf8;border-bottom:1px solid #1a2535;white-space:nowrap">${label}</td>
+        ${[dn20,dn10,base,up10,up20].map((v,i)=>{
+          const isBase = i===2;
+          const cls = v===null?'neg':v>0.10?'pos':v>0?'neu':'neg';
+          const bdr = isBase?'outline:2px solid #f39c12;outline-offset:-2px;':'';
+          return `<td style="padding:7px 8px;text-align:center;border-bottom:1px solid #1a2535;${bdr}">
+            <span class="${cls}" style="${isBase?'color:#f39c12;font-weight:700':''}">${c(v)}</span>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  }
+
+  let html = `
+  <div style="margin-bottom:10px;font-weight:700;font-size:13px;color:#e8f4ff">📊 Nhận xét độ nhạy Equity IRR</div>
+
+  <div style="background:#0f1a28;border-radius:6px;padding:12px 14px;margin-bottom:12px;border-left:3px solid ${accentCol};line-height:1.8">
+    <div style="margin-bottom:6px">
+      <strong style="color:#e8f4ff">Kết luận:</strong>
+      Dự án <strong style="color:${accentCol}">nhạy với ${dominant} hơn</strong>.
+    </div>
+    <div style="font-size:11px;color:#b0c8e0">
+      • <em>Giá thuê</em> tăng 10% → Equity IRR: ${fIRR(baseIRR)} → ${fIRR(rentUp10)}
+        &nbsp;|&nbsp; giảm 10% → ${fIRR(rentDn10)}<br>
+      • <em>Giá đất</em> tăng 10% → Equity IRR: ${fIRR(baseIRR)} → ${fIRR(landUp10)}
+        &nbsp;|&nbsp; giảm 10% → ${fIRR(landDn10)}
+    </div>
+    ${rentElast!==null&&landElast!==null ? `
+    <div style="font-size:11px;color:#b0c8e0;margin-top:6px">
+      • Cứ 1% thay đổi <em>giá thuê</em> → Equity IRR thay đổi khoảng <strong style="color:#27ae60">${(Math.abs(rentElast)*100).toFixed(2)}%</strong><br>
+      • Cứ 1% thay đổi <em>giá đất</em> → Equity IRR thay đổi khoảng <strong style="color:#e74c3c">${(Math.abs(landElast)*100).toFixed(2)}%</strong>
+    </div>` : ''}
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
+    <thead><tr>
+      <th style="text-align:left;padding:6px 8px;background:#0a1220;color:var(--muted);font-size:9.5px">Yếu tố thay đổi</th>
+      <th style="padding:6px 8px;background:#0a1220;color:var(--muted);font-size:9.5px;text-align:center">−20%</th>
+      <th style="padding:6px 8px;background:#0a1220;color:var(--muted);font-size:9.5px;text-align:center">−10%</th>
+      <th style="padding:6px 8px;background:#0a1220;color:#f39c12;font-size:9.5px;text-align:center">Base</th>
+      <th style="padding:6px 8px;background:#0a1220;color:var(--muted);font-size:9.5px;text-align:center">+10%</th>
+      <th style="padding:6px 8px;background:#0a1220;color:var(--muted);font-size:9.5px;text-align:center">+20%</th>
+    </tr></thead>
+    <tbody>
+      ${arrowLine('Giá thuê (giá đất = Base)', irrRentLow, rentDn10, baseIRR, rentUp10, irrRentHigh)}
+      ${arrowLine('Giá đất (giá thuê = Base)', irrLandLow, landDn10, baseIRR, landUp10, irrLandHigh)}
+    </tbody>
+  </table>
+  <div style="font-size:10px;color:var(--muted)">
+    Equity IRR Base = <strong style="color:#f39c12">${f1(baseIRR)}</strong>.
+    Mỗi yếu tố thay đổi độc lập, giữ nguyên yếu tố còn lại bằng giá trị Base.
+  </div>`;
+
+  $('sensComment').innerHTML = html;
+}
+
+// ─── MAIN CALCULATE ──────────────────────────────────────
+function calculate(){
+  const p   = getParams();
+  const res = runModel(p);
+  renderKPIs(res, p);
+  renderTMDT(res, p);
+  renderChart(res);
+  renderTable(res, p);
+  renderSens(p);
+  $('subtitle').innerHTML=
+    `Giá đất <b>$${p.giaDat.toLocaleString('en-US')}</b> | `+
+    `Hard cost <b>$${Math.round(p.suatDauTu*p.dienTich).toLocaleString('en-US')}</b> | `+
+    `Soft cost <b>$${p.softCost.toLocaleString('en-US')}</b> | `+
+    `XD <b>${p.nConstQ} quý</b> | VH <b>${p.nOpsQ} quý</b> | `+
+    `LTV <b>${p.ltv}%</b> | Thuế TNDN <b>${p.thue}%</b> | WACC <b>${p.wacc}%</b> | CK VCSH <b>${p.discEq}%</b>`;
+}
+
+// ─── INIT ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', calculate);
+</script>
+</body>
+</html>
